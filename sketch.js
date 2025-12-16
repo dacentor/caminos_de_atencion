@@ -10,7 +10,7 @@ function setup() {
 
 function draw() {
   background(245);
-
+ botones =[];
   switch (escena) {
     case "1":
       escena1();
@@ -21,6 +21,17 @@ function draw() {
   }
 }
 
+function mousePressed () {
+     for (let b of botones ) {
+        if (
+            mouseX > b.x&& mouseX < b.x + b.w && 
+            mouseY > b.y && mouseY < b.y +b.h 
+        ){
+            b.acction ();
+            break;
+        }
+     }
+}
 // ---- Helpers UI ----
 function titulo(t) {
   fill(20);
@@ -36,13 +47,42 @@ function textoCentrado(t) {
   text(t, width / 2, 80);
 }
 
+function crearBoton(x, y, w, h, label, accion, estilo) {
+  const dentro =
+    mouseX > x && mouseX < x + w &&
+    mouseY > y && mouseY < y + h; 
+    if (estilo === "secundario" ) {
+        fill (dentro? 220 :235);
+        stroke (210);
+    } else {
+        noStroke();
+        fill(dentro ? color(60,140,220) : color(75,159,227));
+    }
+    rectMode(CORNER);
+  rect(x, y, w, h, 22);
+
+  fill(estilo === "secundario" ? 40 : 255);
+  textAlign(CENTER, CENTER);
+  textSize(13);
+  text(label, x + w / 2, y + h / 2);
+
+  botones.push({ x, y, w, h, accion });
+}
 // ---- Escenas ----
 function escena1() {
   titulo("El comienzo del viaje");
-  textoCentrado("Aquí inicia la historia.\n(Aún sin imágenes ni botones)");
+  textoCentrado("Probemos interacción.\nPulsa el botón para ir al epílogo.");
+
+  crearBoton(width / 2 - 90, 450, 180, 45, "Ir al epílogo", () => {
+    escena = "4";
+  });
 }
 
 function escena4() {
   titulo("Epílogo");
-  textoCentrado("Fin provisional.\n(Aún sin lógica de puntuación)");
+  textoCentrado("Aquí termina.\nPulsa para volver.");
+
+  crearBoton(width / 2 - 90, 450, 180, 45, "Volver", () => {
+    escena = "1";
+  }, "secundario");
 }

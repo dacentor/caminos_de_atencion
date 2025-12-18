@@ -7,13 +7,13 @@
 // - Escenas + historial "Atrás" + fade + animaciones + audio por capas + one-shot
 
 // ======================================================
-// DIMENSIONES LÓGICAS (MUNDO) Y ESCALADO RESPONSIVE
+// DIMENSIONES Y ESCALADO RESPONSIVE
 // ======================================================
 const BASE_W = 900;
 const BASE_H = 600;
 
 // Zoom extra en móviles (equilibrado)
-const MOBILE_ZOOM = 1.18; // prueba 1.12–1.25 si quisieras ajustar
+const MOBILE_ZOOM = 1.24; // prueba 1.12–1.25 para ajustar
 
 let SCALE = 1;
 let OFFSET_X = 0;
@@ -563,7 +563,7 @@ function dibujarMariposas() {
 }
 
 // ======================================================
-// ESCENAS (TEXTO ORIGINAL INTACTO)
+// ESCENAS 
 // ======================================================
 function escena1() {
   titulo("El comienzo del viaje");
@@ -871,9 +871,17 @@ function posicionesBotonesAB() {
 
 function botonAtras() {
   if (historialDecisiones.length === 0) return;
-  crearBoton(20, 20, 104, 36, "Atrás", () => deshacerUltimaDecision());
-}
 
+  // Alineado con el borde izquierdo del área de imagen (igual que marginX)
+  const x = LAYOUT.marginX + 35 ;
+  const y = 20;
+
+  crearBoton(
+    x, y, 104, 36,
+    "Atrás",
+    () => deshacerUltimaDecision()
+  );
+}
 function crearBoton(x, y, w, h, label, accion) {
   const mx = mouseWorldX();
   const my = mouseWorldY();

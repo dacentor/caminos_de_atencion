@@ -1,52 +1,44 @@
 // Caminos de Atención - p5.js
-// Layout consistente + Lexend Deca + Historial "Atrás" automático
-// + Todos los botones estilo primario (azul + texto blanco)
+// Layout consistente + Lexend Deca
+// + Historial "Atrás" automático
+// + Atmósfera visual (fade, respiración, calma visible)
 
-let escena = "1"; // 1, 1A, 1B, 2, 2A, 2B, 3, 3A, 3B, 4
+let escena = "1";
 let calmaScore = 0;
 let impulsoScore = 0;
 let botones = [];
 
-/**
- * Historial de decisiones (stack)
- * Cada entrada representa UNA elección (A/B) en una pantalla de decisión.
- * - from: escena donde se tomó la decisión (ej: "2")
- * - to: escena destino tras elegir (ej: "2A")
- * - dCalma / dImpulso: delta aplicado a la puntuación
- *
- * "Atrás" hace pop(), revierte puntuación, y vuelve a ultima.from.
- */
-let historialDecisiones = []; // Array<{ from, to, dCalma, dImpulso }>
+// ----------------------
+// Fade entre escenas
+// ----------------------
+let fadeAlpha = 0;
+let estadoFade = "idle"; // "fadeOut", "fadeIn"
+let escenaPendiente = null;
 
 // ----------------------
-// Layout fijo (misma estructura en todas las escenas)
+// Historial de decisiones
+// ----------------------
+let historialDecisiones = [];
+
+// ----------------------
+// Layout
 // ----------------------
 const LAYOUT = {
   canvasW: 900,
   canvasH: 600,
-
   marginX: 60,
-
   titleY: 24,
   textY: 78,
-
-  // Bloque de imagen (más grande)
   imgTop: 140,
   imgH: 330,
   get imgCenterY() {
     return this.imgTop + this.imgH / 2;
   },
-
-  // Debajo de la imagen
   questionY: 480,
   btnY: 505,
-
-  // Botonera A/B
   btnW: 260,
   btnH: 56,
   btnGap: 18,
-
-  // Botón único
   singleBtnW: 220,
   singleBtnH: 48
 };
@@ -74,7 +66,7 @@ function preload() {
   img2B_puente       = loadImage("assets/rioB.png");
   img3_claro         = loadImage("assets/claro.png");
   img3A_florTocar    = loadImage("assets/florA.png");
-  img3B_florObservar = loadImage("assets/FlorB.png"); // IMPORTANTE: F mayúscula
+  img3B_florObservar = loadImage("assets/FlorB.png");
   img4_epilogo       = loadImage("assets/epilogo.png");
 }
 
@@ -91,27 +83,55 @@ function draw() {
     case "1":  escena1(); break;
     case "1A": escena1A(); break;
     case "1B": escena1B(); break;
-
     case "2":  escena2(); break;
     case "2A": escena2A(); break;
     case "2B": escena2B(); break;
-
     case "3":  escena3(); break;
     case "3A": escena3A(); break;
     case "3B": escena3B(); break;
-
     case "4":  escena4(); break;
   }
 
-  // Debug opcional:
-  // fill(120); textSize(10); textAlign(LEFT, BOTTOM);
-  // text(`Escena:${escena} Calma:${calmaScore} Impulso:${impulsoScore} Hist:${historialDecisiones.length}`, 10, height - 10);
+  drawFade();
 }
 
 // ======================================================
-// HISTORIAL / DESHACER
+// FADE
 // ======================================================
+function cambiarEscena(nuevaEscena) {
+  escenaPendiente = nuevaEscena;
+  estadoFade = "fadeOut";
+}
 
+function drawFade() {
+  if (estadoFade === "fadeOut") {
+    fadeAlpha += 15;
+    if (fadeAlpha >= 255) {
+      fadeAlpha = 255;
+      escena = escenaPendiente;
+      escenaPendiente = null;
+      estadoFade = "fadeIn";
+    }
+  }
+
+  if (estadoFade === "fadeIn") {
+    fadeAlpha -= 15;
+    if (fadeAlpha <= 0) {
+      fadeAlpha = 0;
+      estadoFade = "idle";
+    }
+  }
+
+  if (fadeAlpha > 0) {
+    noStroke();
+    fill(0, fadeAlpha);
+    rect(0, 0, width, height);
+  }
+}
+
+// ======================================================
+// HISTORIAL
+// ======================================================
 function aplicarDecision(dCalma, dImpulso, escenaSiguiente) {
   historialDecisiones.push({
     from: escena,
@@ -122,7 +142,7 @@ function aplicarDecision(dCalma, dImpulso, escenaSiguiente) {
 
   calmaScore += dCalma;
   impulsoScore += dImpulso;
-  escena = escenaSiguiente;
+  cambiarEscena(escenaSiguiente);
 }
 
 function deshacerUltimaDecision() {
@@ -131,18 +151,12 @@ function deshacerUltimaDecision() {
 
   calmaScore -= ultima.dCalma;
   impulsoScore -= ultima.dImpulso;
-
-  // Seguridad ante desajustes
-  calmaScore = Math.max(0, calmaScore);
-  impulsoScore = Math.max(0, impulsoScore);
-
   escena = ultima.from;
 }
 
 // ======================================================
 // ESCENA 1
 // ======================================================
-
 function escena1() {
   titulo("El comienzo del viaje");
   textoCentrado(
@@ -166,8 +180,6 @@ function escena1() {
     "B. Respira y sigue el camino",
     () => aplicarDecision(1, 0, "1B")
   );
-
-  // En la primera escena no hay Atrás (no hay historial)
 }
 
 function escena1A() {
@@ -183,7 +195,7 @@ function escena1A() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
-    () => { escena = "2"; }
+    () => cambiarEscena("2")
   );
 
   botonAtras();
@@ -202,7 +214,7 @@ function escena1B() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
-    () => { escena = "2"; }
+    () => cambiarEscena("2")
   );
 
   botonAtras();
@@ -211,7 +223,6 @@ function escena1B() {
 // ======================================================
 // ESCENA 2
 // ======================================================
-
 function escena2() {
   titulo("El puente de ramas");
   textoCentrado(
@@ -252,7 +263,7 @@ function escena2A() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
-    () => { escena = "3"; }
+    () => cambiarEscena("3")
   );
 
   botonAtras();
@@ -271,7 +282,7 @@ function escena2B() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
-    () => { escena = "3"; }
+    () => cambiarEscena("3")
   );
 
   botonAtras();
@@ -280,7 +291,6 @@ function escena2B() {
 // ======================================================
 // ESCENA 3
 // ======================================================
-
 function escena3() {
   titulo("El claro de la calma");
   textoCentrado(
@@ -321,7 +331,7 @@ function escena3A() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
-    () => { escena = "4"; }
+    () => cambiarEscena("4")
   );
 
   botonAtras();
@@ -340,7 +350,7 @@ function escena3B() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
-    () => { escena = "4"; }
+    () => cambiarEscena("4")
   );
 
   botonAtras();
@@ -349,7 +359,6 @@ function escena3B() {
 // ======================================================
 // EPÍLOGO
 // ======================================================
-
 function escena4() {
   const total = calmaScore + impulsoScore;
   const calmaRatio = total > 0 ? calmaScore / total : 0.5;
@@ -395,22 +404,20 @@ function escena4() {
     width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Volver a empezar",
-    () => resetJuego()
+    resetJuego
   );
-
-  // Si quieres permitir "Atrás" también en el epílogo, descomenta:
-  // botonAtras();
 }
 
 // ======================================================
-// UI / UTILIDADES
+// UI
 // ======================================================
-
 function resetJuego() {
   escena = "1";
   calmaScore = 0;
   impulsoScore = 0;
   historialDecisiones = [];
+  fadeAlpha = 0;
+  estadoFade = "idle";
 }
 
 function titulo(t) {
@@ -446,7 +453,15 @@ function dibujarImagen(img) {
   const drawW = img.width * escala;
   const drawH = img.height * escala;
 
-  image(img, width / 2, LAYOUT.imgCenterY, drawW, drawH);
+  const total = calmaScore + impulsoScore;
+  const calmaRatio = total > 0 ? calmaScore / total : 0.5;
+  const brillo = lerp(180, 255, calmaRatio);
+  tint(brillo);
+
+  const respiracion = sin(frameCount * 0.01) * 4;
+
+  image(img, width / 2, LAYOUT.imgCenterY + respiracion, drawW, drawH);
+  noTint();
 }
 
 function posicionesBotonesAB() {
@@ -460,27 +475,25 @@ function posicionesBotonesAB() {
 
 function botonAtras() {
   if (historialDecisiones.length === 0) return;
-
-  crearBoton(
-    20, 20, 104, 36,
-    "Atrás",
-    () => deshacerUltimaDecision()
-  );
+  crearBoton(20, 20, 104, 36, "Atrás", deshacerUltimaDecision);
 }
 
-/**
- * Botón único estilo primario (azul + texto blanco) para TODOS los botones.
- * Hover: oscurece el azul.
- */
 function crearBoton(x, y, w, h, label, accion) {
   const dentro =
     mouseX > x && mouseX < x + w &&
     mouseY > y && mouseY < y + h;
 
-  rectMode(CORNER);
+  const pulso = dentro ? sin(frameCount * 0.2) * 2 : 0;
+
   noStroke();
   fill(dentro ? color(55, 135, 215) : color(75, 159, 227));
-  rect(x, y, w, h, 16);
+  rect(
+    x - pulso,
+    y - pulso,
+    w + pulso * 2,
+    h + pulso * 2,
+    18
+  );
 
   fill(255);
   textAlign(CENTER, CENTER);

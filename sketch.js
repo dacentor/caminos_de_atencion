@@ -1,15 +1,59 @@
-// "Caminos de Atención" - Versión Luna, Kiro, Mika
-// p5.js
+// Caminos de Atención - p5.js
+// Layout consistente + Lexend Deca + Historial "Atrás" automático
+// + Todos los botones estilo primario (azul + texto blanco)
 
 let escena = "1"; // 1, 1A, 1B, 2, 2A, 2B, 3, 3A, 3B, 4
 let calmaScore = 0;
 let impulsoScore = 0;
 let botones = [];
 
-// Historial para deshacer decisiones (Opción 2)
-let historialDecisiones = []; // { from, to, dCalma, dImpulso }
+/**
+ * Historial de decisiones (stack)
+ * Cada entrada representa UNA elección (A/B) en una pantalla de decisión.
+ * - from: escena donde se tomó la decisión (ej: "2")
+ * - to: escena destino tras elegir (ej: "2A")
+ * - dCalma / dImpulso: delta aplicado a la puntuación
+ *
+ * "Atrás" hace pop(), revierte puntuación, y vuelve a ultima.from.
+ */
+let historialDecisiones = []; // Array<{ from, to, dCalma, dImpulso }>
 
+// ----------------------
+// Layout fijo (misma estructura en todas las escenas)
+// ----------------------
+const LAYOUT = {
+  canvasW: 900,
+  canvasH: 600,
+
+  marginX: 60,
+
+  titleY: 24,
+  textY: 78,
+
+  // Bloque de imagen (más grande)
+  imgTop: 140,
+  imgH: 330,
+  get imgCenterY() {
+    return this.imgTop + this.imgH / 2;
+  },
+
+  // Debajo de la imagen
+  questionY: 480,
+  btnY: 505,
+
+  // Botonera A/B
+  btnW: 260,
+  btnH: 56,
+  btnGap: 18,
+
+  // Botón único
+  singleBtnW: 220,
+  singleBtnH: 48
+};
+
+// ----------------------
 // Imágenes
+// ----------------------
 let img1_inicio;
 let img1A_mariposas;
 let img1B_camino;
@@ -35,8 +79,8 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(900, 600);
-  textFont("sans-serif");
+  createCanvas(LAYOUT.canvasW, LAYOUT.canvasH);
+  textFont("Lexend Deca");
 }
 
 function draw() {
@@ -61,7 +105,7 @@ function draw() {
 
   // Debug opcional:
   // fill(120); textSize(10); textAlign(LEFT, BOTTOM);
-  // text(`Escena: ${escena}  Calma: ${calmaScore}  Impulso: ${impulsoScore}  Hist: ${historialDecisiones.length}`, 10, height - 10);
+  // text(`Escena:${escena} Calma:${calmaScore} Impulso:${impulsoScore} Hist:${historialDecisiones.length}`, 10, height - 10);
 }
 
 // ======================================================
@@ -69,7 +113,6 @@ function draw() {
 // ======================================================
 
 function aplicarDecision(dCalma, dImpulso, escenaSiguiente) {
-  // Guarda la decisión ANTES de cambiar de escena
   historialDecisiones.push({
     from: escena,
     to: escenaSiguiente,
@@ -82,20 +125,23 @@ function aplicarDecision(dCalma, dImpulso, escenaSiguiente) {
   escena = escenaSiguiente;
 }
 
-function deshacerUltimaDecision(escenaAnterior) {
+function deshacerUltimaDecision() {
   const ultima = historialDecisiones.pop();
-  if (ultima) {
-    calmaScore -= ultima.dCalma;
-    impulsoScore -= ultima.dImpulso;
+  if (!ultima) return;
 
-    // Seguridad ante desajustes
-    calmaScore = Math.max(0, calmaScore);
-    impulsoScore = Math.max(0, impulsoScore);
-  }
-  escena = escenaAnterior;
+  calmaScore -= ultima.dCalma;
+  impulsoScore -= ultima.dImpulso;
+
+  // Seguridad ante desajustes
+  calmaScore = Math.max(0, calmaScore);
+  impulsoScore = Math.max(0, impulsoScore);
+
+  escena = ultima.from;
 }
 
-// ============= ESCENA 1: DECISIÓN =============
+// ======================================================
+// ESCENA 1
+// ======================================================
 
 function escena1() {
   titulo("El comienzo del viaje");
@@ -105,24 +151,23 @@ function escena1() {
   );
 
   dibujarImagen(img1_inicio);
+  pregunta("¿Qué hace Luna?");
 
-  textSize(16);
-  fill(40);
-  textAlign(CENTER, TOP);
-  text("¿Qué hace Luna?", width / 2, 330);
+  const { xA, xB } = posicionesBotonesAB();
 
   crearBoton(
-    width/2 - 230, 370, 220, 55,
+    xA, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "A. Se distrae con las mariposas",
     () => aplicarDecision(0, 1, "1A")
   );
 
   crearBoton(
-    width/2 + 10, 370, 220, 55,
+    xB, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "B. Respira y sigue el camino",
-    () => aplicarDecision(1, 0, "1B"),
-    "secundario"
+    () => aplicarDecision(1, 0, "1B")
   );
+
+  // En la primera escena no hay Atrás (no hay historial)
 }
 
 function escena1A() {
@@ -135,10 +180,13 @@ function escena1A() {
   dibujarImagen(img1A_mariposas);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
     () => { escena = "2"; }
   );
+
+  botonAtras();
 }
 
 function escena1B() {
@@ -151,13 +199,18 @@ function escena1B() {
   dibujarImagen(img1B_camino);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
     () => { escena = "2"; }
   );
+
+  botonAtras();
 }
 
-// ============= ESCENA 2: RÍO =============
+// ======================================================
+// ESCENA 2
+// ======================================================
 
 function escena2() {
   titulo("El puente de ramas");
@@ -167,26 +220,23 @@ function escena2() {
   );
 
   dibujarImagen(img2_rio);
+  pregunta("¿Qué hace Luna?");
 
-  textSize(16);
-  fill(40);
-  textAlign(CENTER, TOP);
-  text("¿Qué hace Luna?", width / 2, 330);
+  const { xA, xB } = posicionesBotonesAB();
 
   crearBoton(
-    width/2 - 230, 370, 220, 55,
+    xA, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "A. Sigue a Mika",
     () => aplicarDecision(0, 1, "2A")
   );
 
   crearBoton(
-    width/2 + 10, 370, 220, 55,
+    xB, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "B. Ayuda a Kiro con el puente",
-    () => aplicarDecision(1, 0, "2B"),
-    "secundario"
+    () => aplicarDecision(1, 0, "2B")
   );
 
-  botonBackDesde2();
+  botonAtras();
 }
 
 function escena2A() {
@@ -199,10 +249,13 @@ function escena2A() {
   dibujarImagen(img2A_mika);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
     () => { escena = "3"; }
   );
+
+  botonAtras();
 }
 
 function escena2B() {
@@ -215,13 +268,18 @@ function escena2B() {
   dibujarImagen(img2B_puente);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
     () => { escena = "3"; }
   );
+
+  botonAtras();
 }
 
-// ============= ESCENA 3: FLOR =============
+// ======================================================
+// ESCENA 3
+// ======================================================
 
 function escena3() {
   titulo("El claro de la calma");
@@ -231,26 +289,23 @@ function escena3() {
   );
 
   dibujarImagen(img3_claro);
+  pregunta("¿Qué hace Luna?");
 
-  textSize(16);
-  fill(40);
-  textAlign(CENTER, TOP);
-  text("¿Qué hace Luna?", width / 2, 330);
+  const { xA, xB } = posicionesBotonesAB();
 
   crearBoton(
-    width/2 - 230, 370, 220, 55,
+    xA, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "A. Abrazar la flor",
     () => aplicarDecision(1, 0, "3A")
   );
 
   crearBoton(
-    width/2 + 10, 370, 220, 55,
+    xB, LAYOUT.btnY, LAYOUT.btnW, LAYOUT.btnH,
     "B. Sentarse y observarla",
-    () => aplicarDecision(1, 0, "3B"),
-    "secundario"
+    () => aplicarDecision(1, 0, "3B")
   );
 
-  botonBackDesde3();
+  botonAtras();
 }
 
 function escena3A() {
@@ -263,10 +318,13 @@ function escena3A() {
   dibujarImagen(img3A_florTocar);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
     () => { escena = "4"; }
   );
+
+  botonAtras();
 }
 
 function escena3B() {
@@ -279,31 +337,38 @@ function escena3B() {
   dibujarImagen(img3B_florObservar);
 
   crearBoton(
-    width/2 - 80, 500, 160, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
     () => { escena = "4"; }
   );
+
+  botonAtras();
 }
 
-// ============= ESCENA 4: EPÍLOGO =============
+// ======================================================
+// EPÍLOGO
+// ======================================================
 
 function escena4() {
   const total = calmaScore + impulsoScore;
   const calmaRatio = total > 0 ? calmaScore / total : 0.5;
 
-  background(245);
   titulo("Epílogo: El rastro del bosque");
 
   fill(40);
   textAlign(CENTER, TOP);
   textSize(16);
+  textLeading(22);
 
   const base =
     "Luna regresa con Kiro y Mika.\n" +
     "El bosque guarda el recuerdo de sus elecciones.";
-  text(base, width / 2, 90);
+  text(base, width / 2, 88);
 
   textSize(14);
+  textLeading(20);
+
   if (calmaRatio > 0.6) {
     text(
       "Hoy ha encontrado muchas formas de estar tranquila.\n" +
@@ -327,86 +392,102 @@ function escena4() {
   dibujarImagen(img4_epilogo);
 
   crearBoton(
-    width/2 - 90, 500, 180, 45,
+    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Volver a empezar",
-    () => {
-      escena = "1";
-      calmaScore = 0;
-      impulsoScore = 0;
-      historialDecisiones = [];
-    }
+    () => resetJuego()
   );
+
+  // Si quieres permitir "Atrás" también en el epílogo, descomenta:
+  // botonAtras();
 }
 
-// ============= UTILIDADES =============
+// ======================================================
+// UI / UTILIDADES
+// ======================================================
+
+function resetJuego() {
+  escena = "1";
+  calmaScore = 0;
+  impulsoScore = 0;
+  historialDecisiones = [];
+}
 
 function titulo(t) {
   fill(20);
   textAlign(CENTER, TOP);
-  textSize(26);
-  text(t, width / 2, 30);
+  textSize(28);
+  text(t, width / 2, LAYOUT.titleY);
 }
 
 function textoCentrado(t) {
+  fill(55);
+  textAlign(CENTER, TOP);
+  textSize(16);
+  textLeading(22);
+  text(t, width / 2, LAYOUT.textY);
+}
+
+function pregunta(t) {
   fill(40);
   textAlign(CENTER, TOP);
   textSize(16);
-  text(t, width / 2, 80);
+  text(t, width / 2, LAYOUT.questionY);
 }
 
 function dibujarImagen(img) {
   if (!img) return;
-  const margenX = 60;
-  const w = width - margenX * 2;
-  const h = 260;
+
+  const w = width - LAYOUT.marginX * 2;
+  const h = LAYOUT.imgH;
 
   imageMode(CENTER);
   const escala = Math.min(w / img.width, h / img.height);
   const drawW = img.width * escala;
   const drawH = img.height * escala;
-  image(img, width / 2, 260, drawW, drawH);
+
+  image(img, width / 2, LAYOUT.imgCenterY, drawW, drawH);
 }
 
-function crearBoton(x, y, w, h, label, accion, estilo) {
+function posicionesBotonesAB() {
+  const totalW = LAYOUT.btnW * 2 + LAYOUT.btnGap;
+  const startX = width / 2 - totalW / 2;
+  return {
+    xA: startX,
+    xB: startX + LAYOUT.btnW + LAYOUT.btnGap
+  };
+}
+
+function botonAtras() {
+  if (historialDecisiones.length === 0) return;
+
+  crearBoton(
+    20, 20, 104, 36,
+    "Atrás",
+    () => deshacerUltimaDecision()
+  );
+}
+
+/**
+ * Botón único estilo primario (azul + texto blanco) para TODOS los botones.
+ * Hover: oscurece el azul.
+ */
+function crearBoton(x, y, w, h, label, accion) {
   const dentro =
     mouseX > x && mouseX < x + w &&
     mouseY > y && mouseY < y + h;
 
-  if (estilo === "secundario") {
-    fill(dentro ? 220 : 235);
-    stroke(210);
-  } else {
-    noStroke();
-    fill(dentro ? color(60, 140, 220) : color(75, 159, 227));
-  }
-
   rectMode(CORNER);
-  rect(x, y, w, h, 22);
+  noStroke();
+  fill(dentro ? color(55, 135, 215) : color(75, 159, 227));
+  rect(x, y, w, h, 16);
 
-  fill(estilo === "secundario" ? 40 : 255);
+  fill(255);
   textAlign(CENTER, CENTER);
   textSize(13);
   text(label, x + w / 2, y + h / 2);
 
   botones.push({ x, y, w, h, accion });
-}
-
-function botonBackDesde2() {
-  crearBoton(
-    20, 20, 90, 32,
-    "Atrás",
-    () => deshacerUltimaDecision("1"),
-    "secundario"
-  );
-}
-
-function botonBackDesde3() {
-  crearBoton(
-    20, 20, 90, 32,
-    "Atrás",
-    () => deshacerUltimaDecision("2"),
-    "secundario"
-  );
 }
 
 function mousePressed() {

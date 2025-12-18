@@ -1,15 +1,19 @@
-// Caminos de Atención - p5.js (FINAL FINAL RESPONSIVE)
-// - Mundo lógico fijo 900x600 (tus coordenadas y layout se mantienen)
-// - Canvas real responsive (windowWidth/windowHeight)
-// - Escalado proporcional + centrado (sin recortes)
+// Caminos de Atención - p5.js 
+// - Mundo lógico fijo 900x600 (coordenadas y layout se mantienen)
+// - Canvas responsive (windowWidth/windowHeight)
+// - Escalado proporcional + centrado (sin recortes en desktop)
+// - Zoom extra "equilibrado" en móvil (para que no se vea tan pequeño)
 // - Ratón/touch corregidos para botones, hover e interacción
-// - Todo lo anterior: escenas + historial "Atrás" + fade + animaciones + audio por capas + one-shot
+// - Escenas + historial "Atrás" + fade + animaciones + audio por capas + one-shot
 
 // ======================================================
 // DIMENSIONES LÓGICAS (MUNDO) Y ESCALADO RESPONSIVE
 // ======================================================
 const BASE_W = 900;
 const BASE_H = 600;
+
+// Zoom extra en móviles (equilibrado)
+const MOBILE_ZOOM = 1.18; // prueba 1.12–1.25 si quisieras ajustar
 
 let SCALE = 1;
 let OFFSET_X = 0;
@@ -29,10 +33,8 @@ let calmaScore = 0;
 let impulsoScore = 0;
 let botones = [];
 
-// Historial de decisiones
 let historialDecisiones = []; // { from, to, dCalma, dImpulso }
 
-// Fade entre escenas
 let fadeAlpha = 0;
 let estadoFade = "idle"; // "idle" | "fadeOut" | "fadeIn"
 let escenaPendiente = null;
@@ -155,13 +157,20 @@ function windowResized() {
 }
 
 // ======================================================
-// DRAW (RESPONSIVE POR ESCALADO)
+// DRAW (RESPONSIVE POR ESCALADO + ZOOM EQUILIBRADO EN MÓVIL)
 // ======================================================
 function draw() {
   background(245);
 
-  // Cálculo de escalado para encajar BASE_W x BASE_H en pantalla
+  // 1) Escala base (contain): encaja BASE_W x BASE_H en pantalla
   SCALE = min(width / BASE_W, height / BASE_H);
+
+  // 2) Zoom extra en móvil para mejorar tamaño percibido
+  if (min(windowWidth, windowHeight) < 700) {
+    SCALE *= MOBILE_ZOOM;
+  }
+
+  // 3) Centrado tras aplicar el zoom
   OFFSET_X = (width - BASE_W * SCALE) / 2;
   OFFSET_Y = (height - BASE_H * SCALE) / 2;
 
@@ -889,7 +898,6 @@ function crearBoton(x, y, w, h, label, accion) {
 }
 
 function mousePressed() {
-  // Iniciar audio al primer click
   iniciarAudioSiHaceFalta();
   resolverEntradaClaroPendiente();
 

@@ -1,33 +1,46 @@
-// Caminos de Atención - p5.js
-// Versión final:
-// - Máquina de estados (escenas) + historial con “Atrás” (deshace puntuación)
-// - Fade entre escenas
-// - Animaciones ambientales por escena (ondas, chispas, pájaros)
-// - Interacción (mariposas) en escenas puntuales
-// - Audio por capas: bosque/agua/calma + one-shot de entrada al claro
+// Caminos de Atención - p5.js (FINAL FINAL RESPONSIVE)
+// - Mundo lógico fijo 900x600 (tus coordenadas y layout se mantienen)
+// - Canvas real responsive (windowWidth/windowHeight)
+// - Escalado proporcional + centrado (sin recortes)
+// - Ratón/touch corregidos para botones, hover e interacción
+// - Todo lo anterior: escenas + historial "Atrás" + fade + animaciones + audio por capas + one-shot
 
+// ======================================================
+// DIMENSIONES LÓGICAS (MUNDO) Y ESCALADO RESPONSIVE
+// ======================================================
+const BASE_W = 900;
+const BASE_H = 600;
+
+let SCALE = 1;
+let OFFSET_X = 0;
+let OFFSET_Y = 0;
+
+function VW() { return BASE_W; }
+function VH() { return BASE_H; }
+
+function mouseWorldX() { return (mouseX - OFFSET_X) / SCALE; }
+function mouseWorldY() { return (mouseY - OFFSET_Y) / SCALE; }
+
+// ======================================================
+// ESTADO DEL CUENTO
+// ======================================================
 let escena = "1";
 let calmaScore = 0;
 let impulsoScore = 0;
 let botones = [];
 
-// Historial de decisiones (stack)
+// Historial de decisiones
 let historialDecisiones = []; // { from, to, dCalma, dImpulso }
 
-// ----------------------
 // Fade entre escenas
-// ----------------------
 let fadeAlpha = 0;
 let estadoFade = "idle"; // "idle" | "fadeOut" | "fadeIn"
 let escenaPendiente = null;
 
-// ----------------------
-// Layout fijo
-// ----------------------
+// ======================================================
+// LAYOUT FIJO (EN COORDENADAS DEL MUNDO 900x600)
+// ======================================================
 const LAYOUT = {
-  canvasW: 900,
-  canvasH: 600,
-
   marginX: 60,
 
   titleY: 24,
@@ -35,9 +48,7 @@ const LAYOUT = {
 
   imgTop: 140,
   imgH: 330,
-  get imgCenterY() {
-    return this.imgTop + this.imgH / 2;
-  },
+  get imgCenterY() { return this.imgTop + this.imgH / 2; },
 
   questionY: 480,
   btnY: 505,
@@ -50,9 +61,9 @@ const LAYOUT = {
   singleBtnH: 48
 };
 
-// ----------------------
-// Imágenes
-// ----------------------
+// ======================================================
+// IMÁGENES
+// ======================================================
 let img1_inicio;
 let img1A_mariposas;
 let img1B_camino;
@@ -64,9 +75,9 @@ let img3A_florTocar;
 let img3B_florObservar;
 let img4_epilogo;
 
-// ----------------------
-// Efectos visuales
-// ----------------------
+// ======================================================
+// EFECTOS VISUALES
+// ======================================================
 let mostrarMariposas = false;
 let mariposas = [];
 
@@ -75,17 +86,20 @@ let chispas = [];
 
 let bandada = []; // pájaros
 
-// ----------------------
-// Audio (p5.sound)
-// ----------------------
+// ======================================================
+// AUDIO (p5.sound)
+// ======================================================
 let sndBosque = null;        // loop
 let sndAgua = null;          // loop
-let sndCalma = null;         // loop (escenas del claro)
-let sndClaroEntrada = null;  // one-shot (entrada al claro)
+let sndCalma = null;         // loop
+let sndClaroEntrada = null;  // one-shot
 
-let audioIniciado = false;      // el navegador exige interacción
-let yaSonoEntradaClaro = false;  // evita repetir one-shot al volver atrás
+let audioIniciado = false;
+let yaSonoEntradaClaro = false; // false | true | "pendiente"
 
+// ======================================================
+// PRELOAD
+// ======================================================
 function preload() {
   // Imágenes
   img1_inicio        = loadImage("assets/portada.png");
@@ -99,55 +113,68 @@ function preload() {
   img3B_florObservar = loadImage("assets/FlorB.png"); // respeta mayúsculas/minúsculas
   img4_epilogo       = loadImage("assets/epilogo.png");
 
-  // Audio
-  // Si un archivo no está, p5 mostrará error en consola.
-  // En ese caso, el sketch seguirá funcionando; simplemente esa pista quedará en null.
-  try {
-    sndBosque = loadSound("assets/audio/bosque.mp3");
-    sndAgua = loadSound("assets/audio/agua.mp3");
-    sndCalma = loadSound("assets/audio/calma.mp3");
-    sndClaroEntrada = loadSound("assets/audio/claro_entrada.mp3");
-  } catch (e) {
-    // En entornos donde loadSound falle por configuración, no bloqueamos el sketch.
-    sndBosque = sndAgua = sndCalma = sndClaroEntrada = null;
-  }
+  // Audio (si faltan archivos, verás error en consola; el sketch seguirá)
+  sndBosque = loadSound("assets/audio/bosque.mp3");
+  sndAgua = loadSound("assets/audio/agua.mp3");
+  sndCalma = loadSound("assets/audio/calma.mp3");
+  sndClaroEntrada = loadSound("assets/audio/claro_entrada.mp3");
 }
 
+// ======================================================
+// SETUP + RESIZE
+// ======================================================
 function setup() {
-  createCanvas(LAYOUT.canvasW, LAYOUT.canvasH);
+  createCanvas(windowWidth, windowHeight);
   textFont("Lexend Deca");
 
-  // Mariposas base
+  // Mariposas
   for (let i = 0; i < 8; i++) mariposas.push(nuevaMariposa());
 
-  // Ondas del río
+  // Ondas río
   for (let i = 0; i < 12; i++) {
     ondas.push(nuevaOnda(
-      random(LAYOUT.marginX, width - LAYOUT.marginX),
+      random(LAYOUT.marginX, VW() - LAYOUT.marginX),
       random(LAYOUT.imgTop + LAYOUT.imgH * 0.55, LAYOUT.imgTop + LAYOUT.imgH * 0.92)
     ));
   }
 
-  // Chispas del claro
+  // Chispas claro
   for (let i = 0; i < 45; i++) chispas.push(nuevaChispa());
 
-  // Bandada de pájaros (más pájaros para reforzar presencia en escenas de vuelo)
+  // Bandada
   crearBandada(8);
 
-  // Preparar pistas de loop (no reproducir aún)
+  // Preparar loops (no reproducir todavía)
   prepararLoop(sndBosque);
   prepararLoop(sndAgua);
   prepararLoop(sndCalma);
 }
 
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+// ======================================================
+// DRAW (RESPONSIVE POR ESCALADO)
+// ======================================================
 function draw() {
   background(245);
-  botones = [];
 
-  // Efectos desactivados por defecto; cada escena activa lo suyo
+  // Cálculo de escalado para encajar BASE_W x BASE_H en pantalla
+  SCALE = min(width / BASE_W, height / BASE_H);
+  OFFSET_X = (width - BASE_W * SCALE) / 2;
+  OFFSET_Y = (height - BASE_H * SCALE) / 2;
+
+  // Todo el dibujo ocurre dentro del “mundo” (900x600)
+  push();
+  translate(OFFSET_X, OFFSET_Y);
+  scale(SCALE);
+
+  // Reset por frame
+  botones = [];
   mostrarMariposas = false;
 
-  // Render escena
+  // Escena
   switch (escena) {
     case "1":  escena1(); break;
     case "1A": escena1A(); break;
@@ -164,26 +191,26 @@ function draw() {
     case "4":  escena4(); break;
   }
 
-  // Efectos por escena
+  // Efectos
   dibujarEfectosDeEscena();
   dibujarMariposas();
 
-  // Audio por escena (si ya fue iniciado por interacción)
-  actualizarAudioPorEscena();
-
-  // Fade al final
+  // Fade dentro del mundo (para que cubra todo el layout)
   drawFade();
+
+  pop();
+
+  // Audio fuera (no depende del escalado)
+  actualizarAudioPorEscena();
 }
 
 // ======================================================
-// Cambio de escena + Fade
+// CAMBIO DE ESCENA + FADE
 // ======================================================
-
 function cambiarEscena(nuevaEscena) {
   if (estadoFade !== "idle") return;
 
-  // Bonus: one-shot al entrar al claro (escena 3) por primera vez
-  // Se dispara en el momento de solicitar el cambio, no en draw, para evitar repetición.
+  // One-shot al entrar al claro por primera vez
   if (nuevaEscena === "3") {
     dispararEntradaClaroSiProcede();
   }
@@ -212,14 +239,13 @@ function drawFade() {
   if (fadeAlpha > 0) {
     noStroke();
     fill(0, fadeAlpha);
-    rect(0, 0, width, height);
+    rect(0, 0, VW(), VH());
   }
 }
 
 // ======================================================
-// Historial / Deshacer
+// HISTORIAL / DESHACER
 // ======================================================
-
 function aplicarDecision(dCalma, dImpulso, escenaSiguiente) {
   historialDecisiones.push({
     from: escena,
@@ -244,19 +270,17 @@ function deshacerUltimaDecision() {
   calmaScore = Math.max(0, calmaScore);
   impulsoScore = Math.max(0, impulsoScore);
 
-  // Volver atrás instantáneo (sensación de deshacer)
   escena = ultima.from;
 
-  // Cancelar cualquier transición
+  // Cancelar transición
   fadeAlpha = 0;
   estadoFade = "idle";
   escenaPendiente = null;
 }
 
 // ======================================================
-// Audio
+// AUDIO
 // ======================================================
-
 function prepararLoop(snd) {
   if (!snd) return;
   snd.setLoop(true);
@@ -266,10 +290,8 @@ function prepararLoop(snd) {
 function iniciarAudioSiHaceFalta() {
   if (audioIniciado) return;
 
-  // Requerimiento habitual del navegador (especialmente móvil)
   if (typeof userStartAudio === "function") userStartAudio();
 
-  // Arrancar loops (silenciosos). Después, solo controlamos volumen.
   if (sndBosque && !sndBosque.isPlaying()) sndBosque.play();
   if (sndAgua && !sndAgua.isPlaying()) sndAgua.play();
   if (sndCalma && !sndCalma.isPlaying()) sndCalma.play();
@@ -278,18 +300,13 @@ function iniciarAudioSiHaceFalta() {
 }
 
 function dispararEntradaClaroSiProcede() {
-  // El one-shot requiere audio iniciado (si no, se ignora hasta primer click)
-  // Estrategia: si aún no está iniciado, lo dejaremos sonar en el primer click que inicie audio.
-  if (yaSonoEntradaClaro) return;
+  if (yaSonoEntradaClaro === true) return;
 
   if (audioIniciado && sndClaroEntrada) {
-    // Asegurar no-loop (one-shot)
     sndClaroEntrada.setLoop(false);
     sndClaroEntrada.play();
     yaSonoEntradaClaro = true;
   } else {
-    // Se marca para disparar en el primer click si el usuario entra al claro antes de iniciar audio
-    // y luego hace click: lo resolvemos en mousePressed.
     yaSonoEntradaClaro = "pendiente";
   }
 }
@@ -305,13 +322,6 @@ function resolverEntradaClaroPendiente() {
   yaSonoEntradaClaro = true;
 }
 
-/**
- * Mezcla por escena:
- * - Base: bosque
- * - Río: sube agua
- * - Claro: sube calma, baja un poco bosque
- * - Epílogo: baja todo
- */
 function actualizarAudioPorEscena() {
   if (!audioIniciado) return;
 
@@ -333,7 +343,6 @@ function actualizarAudioPorEscena() {
     vCalma = 0.00;
   }
 
-  // Modulación muy sutil por calma
   const total = calmaScore + impulsoScore;
   const calmaRatio = total > 0 ? (calmaScore / total) : 0.5;
   vCalma *= lerp(0.90, 1.10, calmaRatio);
@@ -344,27 +353,17 @@ function actualizarAudioPorEscena() {
 }
 
 // ======================================================
-// Efectos ambientales por escena
+// EFECTOS POR ESCENA
 // ======================================================
-
 function dibujarEfectosDeEscena() {
-  if (escena === "2" || escena === "2A" || escena === "2B") {
-    dibujarOndasRio();
-  }
-
-  if (escena === "3" || escena === "3A" || escena === "3B") {
-    dibujarChispasCalma();
-  }
-
-  if (escena === "1B" || escena === "2" || escena === "2A" || escena === "3") {
-    dibujarBandada();
-  }
+  if (escena === "2" || escena === "2A" || escena === "2B") dibujarOndasRio();
+  if (escena === "3" || escena === "3A" || escena === "3B") dibujarChispasCalma();
+  if (escena === "1B" || escena === "2" || escena === "2A" || escena === "3") dibujarBandada();
 }
 
 // ----------------------
-// Ondas del río
+// Ondas río
 // ----------------------
-
 function nuevaOnda(x, y) {
   return { x, y, r: random(6, 20), vr: random(0.35, 0.85), a: random(30, 90) };
 }
@@ -384,7 +383,7 @@ function dibujarOndasRio() {
     ellipse(o.x, o.y, o.r * 2, o.r * 1.2);
 
     if (o.a <= 5 || o.r > 65) {
-      o.x = random(LAYOUT.marginX, width - LAYOUT.marginX);
+      o.x = random(LAYOUT.marginX, VW() - LAYOUT.marginX);
       o.y = random(top, bottom);
       o.r = random(6, 18);
       o.vr = random(0.35, 0.85);
@@ -396,12 +395,11 @@ function dibujarOndasRio() {
 }
 
 // ----------------------
-// Chispas de calma
+// Chispas calma
 // ----------------------
-
 function nuevaChispa() {
   return {
-    x: random(width * 0.35, width * 0.65),
+    x: random(VW() * 0.35, VW() * 0.65),
     y: random(LAYOUT.imgTop + 40, LAYOUT.imgTop + LAYOUT.imgH - 40),
     r: random(1.4, 3.2),
     vy: random(0.2, 0.6),
@@ -417,7 +415,7 @@ function dibujarChispasCalma() {
   const auraAlpha = lerp(10, 26, calmaRatio);
   noStroke();
   fill(255, 255, 255, auraAlpha);
-  ellipse(width / 2, LAYOUT.imgCenterY, width * 0.55, LAYOUT.imgH * 0.75);
+  ellipse(VW() / 2, LAYOUT.imgCenterY, VW() * 0.55, LAYOUT.imgH * 0.75);
 
   const alphaBoost = lerp(0, 25, calmaRatio);
   const sway = lerp(0.25, 0.45, calmaRatio);
@@ -430,7 +428,7 @@ function dibujarChispasCalma() {
     ellipse(c.x, c.y, c.r * 2, c.r * 2);
 
     if (c.y < LAYOUT.imgTop + 20) {
-      c.x = random(width * 0.35, width * 0.65);
+      c.x = random(VW() * 0.35, VW() * 0.65);
       c.y = LAYOUT.imgTop + LAYOUT.imgH - 20;
       c.r = random(1.4, 3.2);
       c.vy = random(0.2, 0.6);
@@ -443,7 +441,6 @@ function dibujarChispasCalma() {
 // ----------------------
 // Pájaros (bandada)
 // ----------------------
-
 function crearBandada(n) {
   bandada = [];
   for (let i = 0; i < n; i++) bandada.push(nuevoPajaro(i === 0));
@@ -475,7 +472,7 @@ function dibujarBandada() {
     const x = p.x - p.offsetX;
     const y = p.baseY + sin(frameCount * 0.02 + p.fase) * 14;
 
-    if (x > width - LAYOUT.marginX + 40) {
+    if (x > VW() - LAYOUT.marginX + 40) {
       p.x = LAYOUT.marginX - 60 + p.offsetX;
       p.baseY = random(LAYOUT.imgTop + 35, LAYOUT.imgTop + 110);
       p.vx = random(0.95, 1.55);
@@ -497,12 +494,11 @@ function dibujarBandada() {
 }
 
 // ======================================================
-// Mariposas (interacción en 1A y 2A)
+// MARIPOSAS (INTERACCIÓN)
 // ======================================================
-
 function nuevaMariposa() {
   return {
-    x: random(LAYOUT.marginX, width - LAYOUT.marginX),
+    x: random(LAYOUT.marginX, VW() - LAYOUT.marginX),
     y: random(LAYOUT.imgTop, LAYOUT.imgTop + LAYOUT.imgH),
     offset: random(TWO_PI),
     seed: random(1000),
@@ -514,7 +510,7 @@ function dibujarMariposas() {
   if (!mostrarMariposas) return;
 
   const left = LAYOUT.marginX;
-  const right = width - LAYOUT.marginX;
+  const right = VW() - LAYOUT.marginX;
   const top = LAYOUT.imgTop;
   const bottom = LAYOUT.imgTop + LAYOUT.imgH;
 
@@ -525,14 +521,16 @@ function dibujarMariposas() {
   const extraCount = Math.floor(lerp(0, 4, impulsoRatio));
 
   while (mariposas.length < 8 + extraCount) mariposas.push(nuevaMariposa());
-
   const drawCount = 8 + extraCount;
+
+  const mx = mouseWorldX();
+  const my = mouseWorldY();
 
   for (let i = 0; i < drawCount; i++) {
     const m = mariposas[i];
 
-    const dx = mouseX - m.x;
-    const dy = mouseY - m.y;
+    const dx = mx - m.x;
+    const dy = my - m.y;
 
     const driftX = (noise(m.seed, frameCount * 0.01) - 0.5) * 0.9;
     const driftY = (noise(m.seed + 50, frameCount * 0.01) - 0.5) * 0.9;
@@ -556,9 +554,8 @@ function dibujarMariposas() {
 }
 
 // ======================================================
-// Escenas (texto original intacto)
+// ESCENAS (TEXTO ORIGINAL INTACTO)
 // ======================================================
-
 function escena1() {
   titulo("El comienzo del viaje");
   textoCentrado(
@@ -592,11 +589,10 @@ function escena1A() {
   );
 
   dibujarImagen(img1A_mariposas);
-
   mostrarMariposas = true;
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
     () => cambiarEscena("2")
@@ -615,7 +611,7 @@ function escena1B() {
   dibujarImagen(img1B_camino);
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Seguir adelante",
     () => cambiarEscena("2")
@@ -659,11 +655,10 @@ function escena2A() {
   );
 
   dibujarImagen(img2A_mika);
-
   mostrarMariposas = true;
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
     () => cambiarEscena("3")
@@ -682,7 +677,7 @@ function escena2B() {
   dibujarImagen(img2B_puente);
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Continuar al claro",
     () => cambiarEscena("3")
@@ -728,7 +723,7 @@ function escena3A() {
   dibujarImagen(img3A_florTocar);
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
     () => cambiarEscena("4")
@@ -747,7 +742,7 @@ function escena3B() {
   dibujarImagen(img3B_florObservar);
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Epílogo",
     () => cambiarEscena("4")
@@ -770,7 +765,7 @@ function escena4() {
   const base =
     "Luna regresa con Kiro y Mika.\n" +
     "El bosque guarda el recuerdo de sus elecciones.";
-  text(base, width / 2, 88);
+  text(base, VW() / 2, 88);
 
   textSize(14);
   textLeading(20);
@@ -779,26 +774,26 @@ function escena4() {
     text(
       "Hoy ha encontrado muchas formas de estar tranquila.\n" +
       "Sabe que puede elegir la calma cuando lo necesita.",
-      width / 2, 150
+      VW() / 2, 150
     );
   } else if (calmaRatio < 0.4) {
     text(
       "Su viaje ha tenido muchas distracciones y descubrimientos.\n" +
       "Ha aprendido que también puede parar y escucharse.",
-      width / 2, 150
+      VW() / 2, 150
     );
   } else {
     text(
       "Ha mezclado vuelo y calma.\n" +
       "Entiende que cada elección le enseña algo sobre sí misma.",
-      width / 2, 150
+      VW() / 2, 150
     );
   }
 
   dibujarImagen(img4_epilogo);
 
   crearBoton(
-    width / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
+    VW() / 2 - LAYOUT.singleBtnW / 2, LAYOUT.btnY,
     LAYOUT.singleBtnW, LAYOUT.singleBtnH,
     "Volver a empezar",
     () => resetJuego()
@@ -806,9 +801,8 @@ function escena4() {
 }
 
 // ======================================================
-// UI / Utilidades
+// UI / UTILIDADES
 // ======================================================
-
 function resetJuego() {
   escena = "1";
   calmaScore = 0;
@@ -819,10 +813,7 @@ function resetJuego() {
   estadoFade = "idle";
   escenaPendiente = null;
 
-  // Permitir que el one-shot vuelva a sonar en una nueva partida
   yaSonoEntradaClaro = false;
-
-  // Opcional: regenerar bandada para variar el vuelo
   crearBandada(8);
 }
 
@@ -830,7 +821,7 @@ function titulo(t) {
   fill(20);
   textAlign(CENTER, TOP);
   textSize(28);
-  text(t, width / 2, LAYOUT.titleY);
+  text(t, VW() / 2, LAYOUT.titleY);
 }
 
 function textoCentrado(t) {
@@ -838,20 +829,20 @@ function textoCentrado(t) {
   textAlign(CENTER, TOP);
   textSize(16);
   textLeading(22);
-  text(t, width / 2, LAYOUT.textY);
+  text(t, VW() / 2, LAYOUT.textY);
 }
 
 function pregunta(t) {
   fill(40);
   textAlign(CENTER, TOP);
   textSize(16);
-  text(t, width / 2, LAYOUT.questionY);
+  text(t, VW() / 2, LAYOUT.questionY);
 }
 
 function dibujarImagen(img) {
   if (!img) return;
 
-  const w = width - LAYOUT.marginX * 2;
+  const w = VW() - LAYOUT.marginX * 2;
   const h = LAYOUT.imgH;
 
   imageMode(CENTER);
@@ -859,28 +850,28 @@ function dibujarImagen(img) {
   const drawW = img.width * escala;
   const drawH = img.height * escala;
 
-  // Respiración sutil (no altera brillo)
   const respiracion = sin(frameCount * 0.01) * 4;
-
-  image(img, width / 2, LAYOUT.imgCenterY + respiracion, drawW, drawH);
+  image(img, VW() / 2, LAYOUT.imgCenterY + respiracion, drawW, drawH);
 }
 
 function posicionesBotonesAB() {
   const totalW = LAYOUT.btnW * 2 + LAYOUT.btnGap;
-  const startX = width / 2 - totalW / 2;
+  const startX = VW() / 2 - totalW / 2;
   return { xA: startX, xB: startX + LAYOUT.btnW + LAYOUT.btnGap };
 }
 
 function botonAtras() {
   if (historialDecisiones.length === 0) return;
-
   crearBoton(20, 20, 104, 36, "Atrás", () => deshacerUltimaDecision());
 }
 
 function crearBoton(x, y, w, h, label, accion) {
+  const mx = mouseWorldX();
+  const my = mouseWorldY();
+
   const dentro =
-    mouseX > x && mouseX < x + w &&
-    mouseY > y && mouseY < y + h;
+    mx > x && mx < x + w &&
+    my > y && my < y + h;
 
   const pulso = dentro ? sin(frameCount * 0.2) * 2 : 0;
 
@@ -894,27 +885,29 @@ function crearBoton(x, y, w, h, label, accion) {
   textSize(13);
   text(label, x + w / 2, y + h / 2);
 
-  // Hit-test con caja original (sin pulso)
   botones.push({ x, y, w, h, accion });
 }
 
 function mousePressed() {
-  // Iniciar audio al primer click del usuario
+  // Iniciar audio al primer click
   iniciarAudioSiHaceFalta();
-
-  // Si la entrada al claro quedó pendiente por no haber audio iniciado, resolverla aquí
   resolverEntradaClaroPendiente();
 
-  // Evitar clicks durante transición
   if (estadoFade !== "idle") return;
 
+  const mx = mouseWorldX();
+  const my = mouseWorldY();
+
   for (const b of botones) {
-    if (
-      mouseX > b.x && mouseX < b.x + b.w &&
-      mouseY > b.y && mouseY < b.y + b.h
-    ) {
+    if (mx > b.x && mx < b.x + b.w && my > b.y && my < b.y + b.h) {
       b.accion();
       break;
     }
   }
+}
+
+// Para móviles: tratar touch como click y evitar gestos del navegador encima del canvas
+function touchStarted() {
+  mousePressed();
+  return false;
 }
